@@ -8,7 +8,7 @@ import io
 # =========================================================
 # CONFIG
 # =========================================================
-DRIVE_FOLDER_ID = "1IfbG3x6NE9TQsIu-3eb8hqtvklpMG_J6"  # YOUR MAIN DRIVE FOLDER ID
+DRIVE_FOLDER_ID = "1IfbG3x6NE9TQsIu-3eb8hqtvklpMG_J6"  # MAIN GOOGLE DRIVE FOLDER
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 # =========================================================
@@ -24,14 +24,20 @@ drive_service = build("drive", "v3", credentials=credentials)
 # HELPER FUNCTIONS
 # =========================================================
 def get_or_create_student_folder(roll_no):
-    """Create / fetch roll-number-wise folder inside main dataset folder"""
+    """Create or fetch a folder named with the roll number"""
+
     query = (
         f"name='{roll_no}' and "
         f"mimeType='application/vnd.google-apps.folder' and "
         f"'{DRIVE_FOLDER_ID}' in parents"
     )
 
-    results = drive_service.files().list(q=query, fields="files(id)").execute()
+    results = drive_service.files().list(
+        q=query,
+        fields="files(id)",
+        supportsAllDrives=True
+    ).execute()
+
     files = results.get("files", [])
 
     if files:
@@ -44,15 +50,25 @@ def get_or_create_student_folder(roll_no):
     }
 
     folder = drive_service.files().create(
-        body=folder_metadata, fields="id"
+        body=folder_metadata,
+        fields="id",
+        supportsAllDrives=True
     ).execute()
 
     return folder["id"]
 
 
 def upload_image_to_drive(image_bytes, filename, folder_id):
-    """Upload image bytes to Google Drive"""
-    media = MediaIoBaseUpload(image_bytes, mimetype="image/jpeg")
+    """Upload image bytes safely to Google Drive"""
+
+    image_bytes.seek(0)  # IMPORTANT
+
+    media = MediaIoBaseUpload(
+        image_bytes,
+        mimetype="image/jpeg",
+        resumable=False
+    )
+
     file_metadata = {
         "name": filename,
         "parents": [folder_id]
@@ -61,7 +77,8 @@ def upload_image_to_drive(image_bytes, filename, folder_id):
     drive_service.files().create(
         body=file_metadata,
         media_body=media,
-        fields="id"
+        fields="id",
+        supportsAllDrives=True
     ).execute()
 
 # =========================================================
@@ -70,8 +87,8 @@ def upload_image_to_drive(image_bytes, filename, folder_id):
 st.set_page_config(page_title="Dataset Collection", layout="centered")
 
 st.title("📸 Face Dataset Collection Portal")
-st.markdown("**Academic Project – Camera-based Dataset Collection**")
-st.warning("⚠️ Please use a **laptop webcam**. Mobile phones are not recommended.")
+st.markdown("**Camera-based dataset collection for academic project**")
+st.warning("⚠️ Please use a **laptop webcam**. Avoid mobile phones.")
 
 roll_no = st.text_input("Enter Roll Number (e.g., 22JR1A4228)")
 
@@ -80,7 +97,7 @@ if "count" not in st.session_state:
     st.session_state.count = 0
 
 # =========================================================
-# CAMERA CAPTURE SECTION (PRIMARY)
+# CAMERA CAPTURE (PRIMARY)
 # =========================================================
 st.subheader("📷 Capture Images Using Camera")
 
@@ -90,7 +107,6 @@ if camera_image and roll_no:
     image = Image.open(camera_image)
     img_bytes = io.BytesIO()
     image.save(img_bytes, format="JPEG")
-    img_bytes.seek(0)
 
     if st.button("Save Captured Image"):
         folder_id = get_or_create_student_folder(roll_no)
@@ -99,12 +115,12 @@ if camera_image and roll_no:
         filename = f"{roll_no}_camera_{st.session_state.count}.jpg"
         upload_image_to_drive(img_bytes, filename, folder_id)
 
-        st.success(f"Image {st.session_state.count} captured and uploaded")
+        st.success(f"✅ Image {st.session_state.count} uploaded successfully")
 
-st.info(f"📊 Images captured so far: {st.session_state.count}")
+st.info(f"Images captured so far: {st.session_state.count}")
 
 # =========================================================
-# FILE UPLOAD SECTION (BACKUP OPTION)
+# FILE UPLOAD (BACKUP OPTION)
 # =========================================================
 st.subheader("📁 Upload Images (Backup Option)")
 
@@ -118,7 +134,7 @@ if st.button("Upload Selected Files"):
     if not roll_no:
         st.error("Please enter Roll Number first")
     elif not uploaded_files:
-        st.error("Please select images to upload")
+        st.error("Please select images")
     else:
         folder_id = get_or_create_student_folder(roll_no)
 
@@ -126,17 +142,16 @@ if st.button("Upload Selected Files"):
             image = Image.open(file)
             img_bytes = io.BytesIO()
             image.save(img_bytes, format="JPEG")
-            img_bytes.seek(0)
 
             filename = f"{roll_no}_upload_{idx}.jpg"
             upload_image_to_drive(img_bytes, filename, folder_id)
 
-        st.success("✅ Uploaded all selected images successfully")
+        st.success("✅ All selected images uploaded successfully")
 
 # =========================================================
-# FINAL NOTE
+# FOOTER
 # =========================================================
 st.markdown("---")
 st.markdown(
-    "**Note:** Images are stored securely and used strictly for academic purposes."
+    "**Note:** All images are securely stored and used strictly for academic purposes."
 )
