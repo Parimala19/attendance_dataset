@@ -4,7 +4,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from PIL import Image
 import io
-
+import json
 # ================= CONFIG =================
 DRIVE_FOLDER_ID = "1IfbG3x6NE9TQsIu-3eb8hqtvklpMG_J6"
 SERVICE_ACCOUNT_FILE = "service_account.json"
@@ -12,8 +12,8 @@ SERVICE_ACCOUNT_FILE = "service_account.json"
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 # ================= AUTH =================
-credentials = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE, scopes=SCOPES
+credentials = service_account.Credentials.from_service_account_info(
+    st.secrets["google"], scopes=SCOPES
 )
 
 drive_service = build("drive", "v3", credentials=credentials)
